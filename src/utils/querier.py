@@ -1,4 +1,4 @@
-"""Class to query the LLMs."""
+"""Class to query the LLMs to get responses to the prompt."""
 import json
 import time
 
