@@ -241,10 +241,6 @@ class PaperDataset:
         Returns:
             related_words       : the related words, in conf: keyword: freq.
         """
-        # configs
-        if conference_name is None:
-            conference_name = self.conference_list
-
         pass
 
     def get_percent_numbers(self,
@@ -260,11 +256,23 @@ class PaperDataset:
         Returns:
             percent_numbers     : the percentage of numbers.
         """
-        # configs
-        if conference_name is None:
-            conference_name = self.conference_list
+        pass
 
-        # TODO: exclude the functional numbers, i.e., the numbers in the author list and references
+    def get_complexity_score(self,
+                             conference_name: list = None,
+                             in_full_text: bool = True,
+                             method: str = 'fog'
+                             ) -> Dict[str, float]:
+        """Get the complexity score of the papers.
+
+        Args:
+            conference_name     : conference to search for, default all.
+            in_full_text        : if the keyword must be in the full text.
+            method              : the method to use, 'fog', 'etymology'.
+
+        Returns:
+            complexity_score    : the complexity score.
+        """
         pass
 
 
