@@ -1,6 +1,8 @@
 # grounding-meta-analysis
 Course project for UWaterloo CS784: Computational Linguistics.
 
+python version: 3.10
+
 
 # meanings of grounding
 

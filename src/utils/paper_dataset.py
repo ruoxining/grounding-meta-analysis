@@ -1,12 +1,12 @@
 """Paper dataset class for loading paper data, and related ."""
 import logging
-import re
 from collections import defaultdict
 from typing import Any, Dict, List
 
 import bertopic
 import datasets
 import nltk
+from sklearn.feature_extraction.text import ENGLISH_STOP_WORDS, CountVectorizer
 
 
 class PaperDataset:
@@ -70,6 +70,44 @@ class PaperDataset:
 
         return papers_filtered
 
+    def group_papers(self,
+                     by: str = 'year',
+                     conference_name: str = None,
+                     in_full_text: bool = True,
+                     get_section: str = 'full_text'
+                     ) -> Dict[str, List[str]]:
+        """Group the filtered papers by the given domain.
+
+        Args:
+            by                  : the domain to group by, 'year' or 'conf'.
+            conference_name     : conference to search for.
+            in_full_text        : if the keyword must be in the full text or only in the abstract.
+            get_section         : the section to get, 'abstract', 'full_text', 'main_text', 'reference'.
+
+        Returns:
+            paper_grouped       : the papers retrieved.
+        """
+        papers = self.filter_papers(conference_name=conference_name, in_full_text=in_full_text, get_section=get_section)
+
+        logging.info(f"Grouping the papers by {by}.")
+        paper_grouped = defaultdict(list)
+        if by == 'year':
+            for conf in papers:
+                for paper in papers[conf]:
+                    if len(paper['text'].strip()) == 0:
+                        continue
+                    paper_grouped[paper['year']].append(paper['text'])
+        elif by == 'conf':
+            for conf in papers:
+                for paper in papers[conf]:
+                    if len(paper['text'].strip()) == 0:
+                        continue
+                    paper_grouped[conf].append(paper['text'])
+        else:
+            raise ValueError("Invalid group by.")
+
+        return paper_grouped
+
     def _segment_text(self, 
                       text: str, 
                       get_section: str
@@ -119,14 +157,16 @@ class PaperDataset:
             raise ValueError("Invalid section.")
 
     def get_topics(self,
+                   by: str = 'year',
                    conference_name: list = None,
                    in_full_text: bool = True,
-                   min_topic_size: int = 10,
+                   min_topic_size: int = 2,
                    nr_topics: int = 'auto'
-                   ) -> Dict[str, Any]:
+                   ) -> Dict[str, Dict[str, Any]]:
         """Get the topics in the papers with BERTopic.
 
         Args:
+            by                  : the domain to group by, 'year' or 'conf'.
             conference_name     : conference to search for, default all.
             in_full_text        : if the keyword must be in the full text or only in the abstract.
             min_topic_size      : minimum size of the topic.
@@ -141,32 +181,50 @@ class PaperDataset:
 
         # build topic model
         logging.info("Building the topic model.")
-        topic_model = bertopic.BERTopic(min_topic_size=min_topic_size, nr_topics=nr_topics)
+        stop_words = list(ENGLISH_STOP_WORDS)
+        stop_words.extend(['et', 'al', 'fig', 'table', 'section', 'appendix', 'figure', 'reference', 'references', 'introduction', 'abstract', 'keywords', 'conclusion', 'acknowledgement', 'acknowledgements'])
+        vectorizer = CountVectorizer(stop_words=stop_words)
+        topic_model = bertopic.BERTopic(
+            vectorizer_model=vectorizer,
+            min_topic_size=min_topic_size,
+            nr_topics=nr_topics
+            )
 
         # get papers
-        papers = self.get_paper_full_text(conference_name, in_full_text)
+        papers = self.group_papers(
+            by=by,
+            conference_name=conference_name,
+            in_full_text=in_full_text,
+            get_section='full_text'
+            )
 
         # main loop
-        topics = defaultdict(list)
         logging.info("Extracting the topics.")
-        topics = defaultdict(list)
-        for conf in papers:
-            topics[conf] = []
-            for paper in papers[conf]:
-                topics, _ = topic_model.fit_transform(paper['text'])
-                topic_info = topic_model.get_topic_info()
-                topic_reprensentation = {}
-                for topic_id in set(topics):
-                    if topic_id != -1:
-                        topic_words = topic_model.get_topic(topic_id)
-                        topic_reprensentation[topic_id] = topic_words
-                topics[conf].append({
-                    'paper_id': paper['index'],
-                    'topic_info': topic_info,
-                    'topic_reprensentation': topic_reprensentation
-                    'topics': topics
-                    })
-        return topics
+        topics_all = defaultdict(dict)
+        for year in papers:
+            if len(papers[year]) <= min_topic_size:
+                logging.debug('Skipping year %s due to lack of papers.', year)
+                continue
+            try:
+                topics, _ = topic_model.fit_transform(papers[year])
+            except:
+                # TODO: why is this error
+                logging.debug('Skipping year %s due to an error.???', year)
+                continue
+            topic_info = topic_model.get_topic_info()
+            topic_reprensentation = {}
+            for topic_id in set(topics):
+                if topic_id != -1:
+                    topic_words = topic_model.get_topic(topic_id)
+                    topic_reprensentation[topic_id] = topic_words
+
+            topics_all[year] = {
+                'topic_info': topic_info,
+                'topic_reprensentation': topic_reprensentation,
+                'topics': topics
+                }
+
+        return topics_all
 
     def get_related_words(self,
                           conference_name: list = None,
@@ -220,5 +278,4 @@ if __name__ == "__main__":
 
     paper_dataset = PaperDataset(keyword=args.keyword)
 
-    papers = paper_dataset.filter_papers(conference_name=['ACL'], in_full_text=True, get_section='reference')
-
+    topics = paper_dataset.get_topics(by='year', conference_name=['ACL'], in_full_text=True, min_topic_size=2, nr_topics='auto')
