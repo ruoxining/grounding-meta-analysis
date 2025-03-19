@@ -230,19 +230,43 @@ class PaperDataset:
     def get_related_words(self,
                           conference_name: list = None,
                           in_full_text: bool = True,
-                          method: str = 'llm',
-                          ) -> Dict[str, Dict[str, float]]:
+                          method: str = 'llm'
+                          ) -> Dict[str, Dict[int, Dict[str, Any]]]:
         """Get the related words for the given keyword.
 
         Args:
             conference_name     : conference to search for, default all.
             in_full_text        : if the keyword must be in the full text or only the abstract.
-            method      : the method to use, 'llm', 'sliding_window', 'parsing'.
+            method      : the method to use, 'llm', 'cooccur'.
 
         Returns:
             related_words       : the related words, in conf: keyword: freq.
         """
-        pass
+        papers = self.filter_papers(conference_name=conference_name, in_full_text=in_full_text, get_section='full_text')
+
+        logging.info("Extracting the related words.")
+        related_words = defaultdict(dict)
+        if method == 'llm':
+            pass
+        elif method == 'cooccur':
+            for conf in papers:
+                for paper in papers[conf]:
+                    related_words[conf][paper['index']] = {
+                        'year': paper['year'],
+                        'related_words': []
+                        }
+                    sentences = nltk.sent_tokenize(paper['text'])
+                    for sentence in sentences:
+                        # get nouns from a sentence
+                        words = nltk.word_tokenize(sentence)
+                        pos_tags = nltk.pos_tag(words)
+                        if self._keyword not in words:
+                            continue
+                        indices_noun = [i for i, (_, pos) in enumerate(pos_tags) if pos in ['NN', 'NNS', 'NNP', 'NNPS']]
+                        words_noun = [words[i] for i in indices_noun]
+                        related_words[conf][paper['index']]['related_words'].extend(words_noun)
+
+        return related_words
 
     def get_percent_numbers(self,
                             conference_name: list = None,
@@ -259,6 +283,7 @@ class PaperDataset:
         """
         papers = self.filter_papers(conference_name=conference_name, in_full_text=in_full_text, get_section='main_text')
 
+        logging.info("Calculating the percentage of numbers.")
         percent_numbers = defaultdict(dict)
         for conf in papers:
             for paper in papers[conf]:
@@ -290,6 +315,7 @@ class PaperDataset:
         """
         papers = self.filter_papers(conference_name=conference_name, in_full_text=in_full_text, get_section='full_text')
 
+        logging.info(f"Calculating the complexity score with {method}.")
         complexity_scores = defaultdict(dict)
         if method == 'fog':
             for conf in papers:
@@ -311,8 +337,8 @@ if __name__ == "__main__":
 
     logging.basicConfig(level=logging.INFO)
 
-    # to make no filtering
-    if args.keyword == 'all':
+    # TODO: to make no filtering, but will have some buggy behavior
+    if args.keyword is None:
         args.keyword = ' '
 
     paper_dataset = PaperDataset(keyword=args.keyword)
@@ -321,7 +347,8 @@ if __name__ == "__main__":
 
     # complexity_scores = paper_dataset.get_complexity_score(conference_name=['ACL'], in_full_text=True, method='fog')
 
-    percent_numbers = paper_dataset.get_percent_numbers(conference_name=['ACL'], in_full_text=True)
+    # percent_numbers = paper_dataset.get_percent_numbers(conference_name=['ACL'], in_full_text=True)
 
+    related_words = paper_dataset.get_related_words(conference_name=['ACL'], in_full_text=True, method='cooccur')
 
     from IPython import embed; embed()
