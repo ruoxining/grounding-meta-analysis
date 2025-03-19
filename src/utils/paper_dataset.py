@@ -6,6 +6,7 @@ from typing import Any, Dict, List
 import bertopic
 import datasets
 import nltk
+import textstat
 from sklearn.feature_extraction.text import ENGLISH_STOP_WORDS, CountVectorizer
 
 
@@ -246,7 +247,7 @@ class PaperDataset:
     def get_percent_numbers(self,
                             conference_name: list = None,
                             in_full_text: bool = True,
-                            ) -> Dict[str, float]:
+                            ) -> Dict[str, Dict[int, Dict[str, Any]]]:
         """Get the percentage of numbers in selected papers.
 
         Args:
@@ -256,25 +257,51 @@ class PaperDataset:
         Returns:
             percent_numbers     : the percentage of numbers.
         """
-        pass
+        papers = self.filter_papers(conference_name=conference_name, in_full_text=in_full_text, get_section='main_text')
+
+        percent_numbers = defaultdict(dict)
+        for conf in papers:
+            for paper in papers[conf]:
+                if len(paper['text'].strip()) == 0:
+                    continue
+                total_words = len(paper['text'].split())
+                total_numbers = sum(c.isdigit() for c in paper['text'])
+                percent_numbers[conf][paper['index']] = {
+                    'year': paper['year'],
+                    'percent': total_numbers / total_words
+                    }
+
+        return percent_numbers
 
     def get_complexity_score(self,
                              conference_name: list = None,
                              in_full_text: bool = True,
                              method: str = 'fog'
-                             ) -> Dict[str, float]:
+                             ) -> Dict[str, Dict[int, Dict[str, Any]]]:
         """Get the complexity score of the papers.
 
         Args:
             conference_name     : conference to search for, default all.
             in_full_text        : if the keyword must be in the full text.
-            method              : the method to use, 'fog', 'etymology'.
+            method              : method to use, 'fog', 'etymology'.
 
         Returns:
-            complexity_score    : the complexity score.
+            complexity_scores   : complexity scores of each paper with years.
         """
-        pass
+        papers = self.filter_papers(conference_name=conference_name, in_full_text=in_full_text, get_section='full_text')
 
+        complexity_scores = defaultdict(dict)
+        if method == 'fog':
+            for conf in papers:
+                for paper in papers[conf]:
+                    complexity_scores[conf][paper['index']] = {
+                        'year': paper['year'],
+                        'score': textstat.gunning_fog(paper['text'])
+                        }
+        elif method == 'etymology':
+            pass
+
+        return complexity_scores
 
 if __name__ == "__main__":
     import argparse
@@ -284,6 +311,17 @@ if __name__ == "__main__":
 
     logging.basicConfig(level=logging.INFO)
 
+    # to make no filtering
+    if args.keyword == 'all':
+        args.keyword = ' '
+
     paper_dataset = PaperDataset(keyword=args.keyword)
 
-    topics = paper_dataset.get_topics(by='year', conference_name=['ACL'], in_full_text=True, min_topic_size=2, nr_topics='auto')
+    # topics = paper_dataset.get_topics(by='year', conference_name=['ACL'], in_full_text=True, min_topic_size=2, nr_topics='auto')
+
+    # complexity_scores = paper_dataset.get_complexity_score(conference_name=['ACL'], in_full_text=True, method='fog')
+
+    percent_numbers = paper_dataset.get_percent_numbers(conference_name=['ACL'], in_full_text=True)
+
+
+    from IPython import embed; embed()
