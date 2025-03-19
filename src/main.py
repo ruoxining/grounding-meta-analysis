@@ -2,7 +2,7 @@
 import argparse
 import logging
 
-from utils.experiments import Experiments
+from utils.experiment import Experiments
 
 if __name__ == '__main__':
     # configs
