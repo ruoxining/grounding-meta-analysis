@@ -3,6 +3,24 @@ Course project for UWaterloo CS784: Computational Linguistics.
 
 python version: 3.10
 
+How to run the code:
+
+```bash
+pip install -r requirements.txt
+
+python src/main.py -k grounding -a key -e <experiment-name>
+```
+
+Supported experiment names:
+
+- `all`: run all the following experiments.
+- `keyword_model`: keyword extraction from full text (?)
+- `topic_model`: topic modeling from full text (?)
+- `coocuring_keywords`: see if several specific keywords are coocurring with the topic keyword.
+- `percent_numbers`: model the percentage of numbers in the paper.
+- `complexity_scores`: model the complexity score of the paper's writing style.
+- `trend`: model the trend by year / by conference of the number of the papers.
+
 
 # meanings of grounding
 
