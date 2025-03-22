@@ -230,7 +230,7 @@ class PaperDataset:
     def get_related_words(self,
                           conference_name: list = None,
                           in_full_text: bool = True,
-                          method: str = 'llm'
+                          method: str = 'cooccur'
                           ) -> Dict[str, Dict[int, Dict[str, Any]]]:
         """Get the related words for the given keyword.
 
@@ -267,6 +267,12 @@ class PaperDataset:
                         related_words[conf][paper['index']]['related_words'].extend(words_noun)
 
         return related_words
+
+    # TODO: define several keywords and see the co-occurrence
+
+    def get_cooccurring_keywords(self,conference_name: list = None,) -> Dict[str, Dict[int, Dict[str, Any]]]:
+        """."""
+        pass
 
     def get_percent_numbers(self,
                             conference_name: list = None,
