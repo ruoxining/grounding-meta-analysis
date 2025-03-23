@@ -278,30 +278,32 @@ class Experiments:
         logging.info('Modeling the trend grouping by conference...')
 
         # get papers by conference
+        papers_all = self._paper_dataset.dataset
         papers = self._paper_dataset.filter_papers()
 
-        # build number diction
+        # build percentage diction
         number_dict = defaultdict(dict)
-        for conf, conf_paper in papers.items():
+        for (conf, conf_paper), (conf, conf_paper_all) in zip(papers.items(), papers_all.items()):
             for fields in conf_paper:
                 year = fields['year'].split('_')[0]
                 if year not in number_dict[conf]:
                     number_dict[conf][year] = 0
                 number_dict[conf][year] += 1
+            number_dict[conf] = {k: v / len(conf_paper_all) for k, v in number_dict[conf].items()}
 
         # average
-        average = defaultdict(int)
-        for conf, years in number_dict.items():
-            for year, number in years.items():
-                if year not in average:
-                    average[year] = 0
-                average[year] += number
+        year_counts = defaultdict(int)
+        average = defaultdict(float)
+
+        for conf, year_data in number_dict.items():
+            for year, percentage in year_data.items():
+                clean_year = year.split('_')[0]
+                average[clean_year] += percentage
+                year_counts[clean_year] += 1
+
         for year in average:
-            year_total = 0
-            for conf, years in number_dict.items():
-                if year in years:
-                    year_total += 1
-            average[year] /= year_total
+            if year_counts[year] > 0:
+                average[year] = average[year] / year_counts[year]
 
         # plot the trend
         self._plot_trend(data=number_dict,
@@ -341,7 +343,8 @@ class Experiments:
 
         for conf, years in data.items():
             for year, number in years.items():
-                all_years.add(year)
+                clean_year = year.split('_')[0]
+                all_years.add(clean_year)
 
         numeric_years = [int(year) for year in all_years]
         sorted_years = sorted(numeric_years)
@@ -361,7 +364,7 @@ class Experiments:
             xy_pairs.sort(key=lambda pair: pair[0])
 
             x_values = [pair[0] for pair in xy_pairs]
-            y_values = [pair[1] for pair in xy_pairs]
+            y_values = [pair[1]*100 for pair in xy_pairs]
 
             ax.plot(x_values, y_values, marker='o', label=conference, color=color, 
                     linewidth=2, markersize=6, linestyle='-')
@@ -374,13 +377,15 @@ class Experiments:
             xy_pairs.sort(key=lambda pair: pair[0])
 
             x_values = [pair[0] for pair in xy_pairs]
-            y_values = [pair[1] for pair in xy_pairs]
+            y_values = [pair[1]*100 for pair in xy_pairs]
 
-            ax.plot(x_values, y_values, marker='o', label='Average', color=colors[-1], 
+            ax.plot(x_values, y_values, marker='o', label='Average', color=colors[-1],
                     linewidth=2, markersize=6, linestyle='-')
 
         ax.set_xlabel('Year', fontsize=12)
-        ax.set_ylabel('Number of Papers', fontsize=12)
+        ax.set_ylabel('Percent of Papers', fontsize=12)
+        ax.yaxis.set_major_formatter(plt.matplotlib.ticker.PercentFormatter(xmax=100))
+
         ax.set_title('Trend of Research Papers', fontsize=14)
 
         ax.set_xticks(sorted_years)
@@ -411,10 +416,10 @@ class Experiments:
                 decade = year[:3] + '0'
                 decades[decade][conf].append(fields['text'])
 
-        # main loop
-        # TODO: rethink embedding's structure
-        embeddings = defaultdict(list)
+        # embeddings: conf: [key: embedding]
+        embeddings = defaultdict(dict)
 
+        # main loop
         for decade in decades:
             # get the papers
             papers = decades[decade]
@@ -431,7 +436,7 @@ class Experiments:
                     )
 
             # get the embeddings of the keywords (input and concerned)
-            anchor_words = [] # TODO: get from the keywords, should be loaded
+            anchor_words = []
 
             words_to_check = anchor_words.append(self._keyword)
 
@@ -440,7 +445,6 @@ class Experiments:
                     embeddings[decade].append(model.wv[word])
                 else:
                     logging.warning(f"'{word}' not in vocabulary")
-
 
         pass
 
@@ -473,3 +477,14 @@ class Experiments:
 
         return
 
+    def _match_embeddings(self):
+        """Match the embeddings of the keywords."""
+        pass
+
+    def _calculate_semantic_change(self):
+        """Calculate the semantic change."""
+        pass
+
+    def _plot_semantic_change(self):
+        """Plot the semantic change."""
+        pass

@@ -19,6 +19,11 @@ class PaperDataset:
         self._keyword = keyword
 
     @property
+    def dataset(self) -> Dict[str, datasets.arrow_dataset.Dataset]:
+        """Return the dataset."""
+        return self._ds
+
+    @property
     def conference_list(self) -> List[str]:
         """Return the list of conferences."""
         return self._ds.keys()
