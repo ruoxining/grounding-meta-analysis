@@ -1,6 +1,7 @@
 """Class to conduct experiments."""
 import json
 import logging
+import os
 from collections import defaultdict
 from typing import Any, Dict, List
 
@@ -31,34 +32,42 @@ class Experiments:
         # get keywords
         logging.info('Getting keywords...')
         keyword_path = 'data/keywords.json'
-        with open('data/keywords.json', 'r') as f:
-            keywords = json.load(f)
-        if len(keywords.strip()) == 0:
+        if os.path.exists(keyword_path):
+            with open('data/keywords.json', 'r') as f:
+                keywords = json.load(f)
+        else:
             keywords = self._paper_dataset.get_related_words()
             with open(keyword_path, 'w') as f:
                 f.write(json.dumps(keywords, indent=4, ensure_ascii=False))
 
-        # print the keywords
-        from IPython import embed; embed()
+        # NOTE: cleaned with extra script
+
         # get embeddings
-        logging.info('Getting embeddings...')
-        embeddings = self._encoder.encode(keywords)
-
-        # clustering
-        logging.info('Clustering...')
-        clusters = KMeans(n_clusters=5, random_state=0).fit(embeddings)
-
-        # visualize
-        logging.info('Visualizing...')
-        self._visualize(embedding=embeddings, labels=clusters.labels_)
-
-        # TODO: make a logging file with the embeddings
+        # plot the keywords
+        # TODO
 
     def model_topic_clusters(self) -> None:
         """Model the topics of papers by clustering."""
+        logging.info('Modeling topic clusters...')
 
-        # get papers
+        # get topics
+        logging.info('Getting topics...')
+        topic_path = 'data/topics.json'
+        if os.path.exists(topic_path):
+            with open(topic_path, 'r') as f:
+                topics = json.load(f)
+        else:
+            topics = self._paper_dataset.get_topics()
 
+            for year in topics:
+                if 'topic_info' in topics[year] and hasattr(topics[year]['topic_info'], 'to_dict'):
+                    topics[year]['topic_info'] = topics[year]['topic_info'].to_dict(orient='records')
+
+            with open(topic_path, 'w') as f:
+                f.write(json.dumps(topics, indent=4, ensure_ascii=False))
+
+        # get embeddings
+        # TODO
         pass
 
     def _visualize(self, embedding: np.ndarray, labels: List[int]) -> None:
@@ -424,6 +433,8 @@ class Experiments:
             # get the papers
             papers = decades[decade]
 
+            # TODO: train with all data
+
             # load or train the word2vec model
             logging.info('Loading or training the Word2Vec model...')
             model_path = f'data/word2vec_{decade}.model'
@@ -437,7 +448,6 @@ class Experiments:
 
             # get the embeddings of the keywords (input and concerned)
             anchor_words = []
-
             words_to_check = anchor_words.append(self._keyword)
 
             for word in words_to_check:
@@ -446,7 +456,14 @@ class Experiments:
                 else:
                     logging.warning(f"'{word}' not in vocabulary")
 
-        pass
+        # match the embeddings
+        self._match_embeddings(embeddings=embeddings)
+
+        # calculate the semantic change
+        self._calculate_semantic_change(embeddings=embeddings)
+
+        # plot the semantic change
+        self._plot_semantic_change(embeddings=embeddings)
 
     def _train_word2vec(self,
                         model_path: str,
@@ -477,14 +494,37 @@ class Experiments:
 
         return
 
-    def _match_embeddings(self):
-        """Match the embeddings of the keywords."""
+    def _match_embeddings(self,
+                          embeddings: Dict[str, List[np.ndarray]]
+                          ) -> None:
+        """Match the embeddings of the keywords by training and transforming."""
+        
         pass
 
-    def _calculate_semantic_change(self):
+    def _calculate_semantic_change(self,
+                                   embeddings: Dict[str, List[np.ndarray]]
+                                   ) -> None:
         """Calculate the semantic change."""
+
+        # match all embeddings through training the matrix
+
+        # perform the transformation based on the matrix
+
+        # calculate the transformed distance
+
         pass
 
-    def _plot_semantic_change(self):
+    def _plot_semantic_change(self,
+                              embeddings: Dict[str, List[np.ndarray]]
+                              ) -> None:
         """Plot the semantic change."""
+
+        # for the transformed embeddings
+
+        # take the anchor words' average
+
+        # point the anchor words
+
+        # point the keyword
+
         pass
