@@ -7,6 +7,7 @@ from typing import Any, Dict, List
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
+from gensim.models import Word2Vec
 from sentence_transformers import SentenceTransformer
 from sklearn.cluster import KMeans
 
@@ -277,65 +278,117 @@ class Experiments:
         logging.info('Modeling the trend grouping by conference...')
 
         # get papers by conference
-        papers = self._paper_dataset.group_papers(by='conf')
+        papers = self._paper_dataset.filter_papers()
 
-        # get counts by conference
-        counts = defaultdict(int)
-        for conference, papers in papers.items():
-            counts[conference] = len(papers)
+        # build number diction
+        number_dict = defaultdict(dict)
+        for conf, conf_paper in papers.items():
+            for fields in conf_paper:
+                year = fields['year'].split('_')[0]
+                if year not in number_dict[conf]:
+                    number_dict[conf][year] = 0
+                number_dict[conf][year] += 1
 
-        # plot
-        self._plot_trend(data=counts,
-                         save_path='assets/trend_by_conf.png',
-                         title='Trend of Research Papers by Conference',
-                         x_label='Conference'
-                         )
+        # average
+        average = defaultdict(int)
+        for conf, years in number_dict.items():
+            for year, number in years.items():
+                if year not in average:
+                    average[year] = 0
+                average[year] += number
+        for year in average:
+            year_total = 0
+            for conf, years in number_dict.items():
+                if year in years:
+                    year_total += 1
+            average[year] /= year_total
 
-        logging.info('Modeling the trend grouping by year...')
-
-        # get papers by year
-        papers = self._paper_dataset.group_papers(by='year')
-
-        # get counts by year
-        counts = defaultdict(int)
-        for year, papers in papers.items():
-            counts[year.split('_')[0]] = len(papers)
-
-        # plot
-        self._plot_trend(data=counts,
-                         save_path='assets/trend_by_year.png',
-                         title='Trend of Research Papers by Year',
-                         x_label='Year'
+        # plot the trend
+        self._plot_trend(data=number_dict,
+                         save_path='assets/trend.png',
+                         average=average,
+                         colors=[
+                                '#8dd3c7',  # Light teal
+                                '#bebada',  # Light purple
+                                '#fb8072',  # Light salmon
+                                '#80b1d3',  # Light blue
+                                '#fdb462',  # Light orange
+                                '#b3de69',  # Light green
+                                '#fccde5',  # Light pink
+                                '#d9d9d9',  # Light gray
+                                '#bc80bd',  # Light violet
+                                '#ccebc5',  # Light mint
+                                '#ffed6f',  # Light yellow
+                                '#e41a1c',  # Strong red (for average)
+                            ]
                          )
 
     def _plot_trend(self,
-                    data: Dict[str, int],
-                    figsize: tuple = (12, 8),
-                    save_path: str = None,
-                    title: str = None,
-                    x_label: str = None,
+                    data: Dict[str, List[Dict[str, Any]]],
+                    save_path: str,
+                    average: Dict[str, float] = None,
+                    colors: list = plt.cm.tab10.colors
                     ) -> None:
-        """Plot the trend of the research with respect to the year/conf."""
-        # sort the data
-        sorted_data = sorted(data.items(), key=lambda x: x[0])
+        """Plot the trend of the research with respect to the year/conf.
+
+        Args:
+            data        : The conference data in the format {conference: [{year: year, percent: value}, ...]}.
+            save_path   : Path to save the figure.
+        """
+        # process data
+        logging.info('Processing data...')
+        all_years = set()
+
+        for conf, years in data.items():
+            for year, number in years.items():
+                all_years.add(year)
+
+        numeric_years = [int(year) for year in all_years]
+        sorted_years = sorted(numeric_years)
 
         # create the plot
-        fig, ax = plt.subplots(figsize=figsize)
+        logging.info('Creating the plot...')
+        fig, ax = plt.subplots(figsize=(12, 8))
 
-        x_values = [item[0] for item in sorted_data]
-        y_values = [item[1] for item in sorted_data]
+        for i, (conference, years_data) in enumerate(data.items()):
+            color = colors[i % len(colors)]
 
-        ax.plot(x_values, y_values, marker='o', color='b', linewidth=2, markersize=6, linestyle='-')
+            xy_pairs = []
+            for year in sorted_years:
+                if str(year) in years_data:
+                    xy_pairs.append((int(year), years_data[str(year)]))
 
-        ax.set_xlabel(x_label, fontsize=12)
+            xy_pairs.sort(key=lambda pair: pair[0])
+
+            x_values = [pair[0] for pair in xy_pairs]
+            y_values = [pair[1] for pair in xy_pairs]
+
+            ax.plot(x_values, y_values, marker='o', label=conference, color=color, 
+                    linewidth=2, markersize=6, linestyle='-')
+
+        if average:
+            xy_pairs = []
+            for year, value in average.items():
+                xy_pairs.append((int(year), value))
+
+            xy_pairs.sort(key=lambda pair: pair[0])
+
+            x_values = [pair[0] for pair in xy_pairs]
+            y_values = [pair[1] for pair in xy_pairs]
+
+            ax.plot(x_values, y_values, marker='o', label='Average', color=colors[-1], 
+                    linewidth=2, markersize=6, linestyle='-')
+
+        ax.set_xlabel('Year', fontsize=12)
         ax.set_ylabel('Number of Papers', fontsize=12)
+        ax.set_title('Trend of Research Papers', fontsize=14)
 
-        ax.set_title(title if title else 'Trend of Research Papers', fontsize=14)
-
-        ax.set_xticks(x_values)
-        ax.set_xticklabels(x_values, rotation=45)
+        ax.set_xticks(sorted_years)
+        ax.set_xticklabels([str(year) for year in sorted_years], rotation=45)
 
         ax.grid(True, linestyle='--', alpha=0.7)
+
+        ax.legend(loc='best', fontsize=10)
 
         plt.tight_layout()
 
@@ -347,16 +400,76 @@ class Experiments:
     def model_semantic_change(self) -> None:
         """Model the semantic change of the research with respect to the year.
         """
-        # NOTE: high
-
         # get papers by year and conference
+        papers = self._paper_dataset.filter_papers()
 
-        # train the word2vec model on each year's papers
+        # seperate the papers by decade
+        decades = defaultdict(lambda: defaultdict(list))
+        for conf, papers in papers.items():
+            for pid, fields in papers.items():
+                year = fields['year'].split('_')[0]
+                decade = year[:3] + '0'
+                decades[decade][conf].append(fields['text'])
 
-        # save the model
+        # main loop
+        # TODO: rethink embedding's structure
+        embeddings = defaultdict(list)
 
-        # get the embeddings of the keywords (input and concerned)
+        for decade in decades:
+            # get the papers
+            papers = decades[decade]
 
-        # 
+            # load or train the word2vec model
+            logging.info('Loading or training the Word2Vec model...')
+            model_path = f'data/word2vec_{decade}.model'
+            if model_path.exists():
+                model = Word2Vec.load(model_path)
+            else:
+                self._train_word2vec(
+                    model_path=model_path,
+                    data=papers
+                    )
+
+            # get the embeddings of the keywords (input and concerned)
+            anchor_words = [] # TODO: get from the keywords, should be loaded
+
+            words_to_check = anchor_words.append(self._keyword)
+
+            for word in words_to_check:
+                if word in model.wv:
+                    embeddings[decade].append(model.wv[word])
+                else:
+                    logging.warning(f"'{word}' not in vocabulary")
+
 
         pass
+
+    def _train_word2vec(self,
+                        model_path: str,
+                        data: List[List[str]],
+                        vector_size: int = 100,
+                        window: int = 5,
+                        min_count: int = 1,
+                        workers: int = 4,
+                        sg: int = 1,
+                        epochs: int = 100
+                        ) -> None:
+        """Train the Word2Vec model."""
+        logging.info('Training the Word2Vec model...')
+
+        # train model
+        model = Word2Vec(
+            sentences=data,
+            vector_size=vector_size,
+            window=window,
+            min_count=min_count,
+            workers=workers,
+            sg=sg,
+            epochs=epochs
+        )
+
+        # save the model
+        model.save(model_path)
+
+        return
+
