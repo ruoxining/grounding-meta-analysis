@@ -84,21 +84,61 @@ class Experiments:
 
     def model_percent_numbers(self) -> None:
         """Model the percentage of numbers with respect to the year/conf."""
-        # NOTE: high
-
         # get data
         logging.info('Getting the percentage of numbers...')
         percent_numbers = self._paper_dataset.get_percent_numbers()
 
-        # plot the percentage 
-        self._plot_percent_numbers(percent_numbers=percent_numbers, save_path='assets/percent_numbers.png')
+        # calculate an average of these numbers
+        average = defaultdict(dict)
+        for conf, papers in percent_numbers.items():
+            for pid, fields in papers.items():
+                year = fields['year'].split('_')[0]
+                percent = fields['percent']
+                if year not in average:
+                    average[year] = 0
+                average[year] += percent
 
-    def _plot_percent_numbers(self,
-                              percent_numbers: Dict[str, List[Dict[str, Any]]],
-                              figsize: tuple = (12, 8),
-                              save_path: str = None,
-                              title: str = None
-                              ) -> None:
+        for year in average:
+            paper_count = 0
+            for conf, papers in percent_numbers.items():
+                for pid, fields in papers.items():
+                    if fields['year'].split('_')[0] == year:
+                        paper_count += 1
+            average[year] /= paper_count
+
+        # plot the percentage 
+        self._plot_float_features(
+            percent_numbers=percent_numbers,
+            average=average,
+            save_path='assets/percent_numbers.png',
+            y_label='Percentage of Numbers',
+            title='Percentage of Numbers in Research Papers',
+            colors= [
+                '#8dd3c7',  # Light teal
+                '#bebada',  # Light purple
+                '#fb8072',  # Light salmon
+                '#80b1d3',  # Light blue
+                '#fdb462',  # Light orange
+                '#b3de69',  # Light green
+                '#fccde5',  # Light pink
+                '#d9d9d9',  # Light gray
+                '#bc80bd',  # Light violet
+                '#ccebc5',  # Light mint
+                '#ffed6f',  # Light yellow
+                '#e41a1c',  # Strong red (for average)
+                ]
+            )
+
+    def _plot_float_features(self,
+                             percent_numbers: Dict[str, List[Dict[str, Any]]],
+                             average: Dict[str, float] = None,
+                             figsize: tuple = (12, 8),
+                             save_path: str = None,
+                             data_domain: str = 'percent',
+                             y_label: str = None,
+                             title: str = None,
+                             colors: list = plt.cm.tab10.colors
+                             ) -> None:
         """Plot a line chart showing the average feature value per year for each conference.
 
         Args:
@@ -116,13 +156,13 @@ class Experiments:
         all_years = set()
 
         for conference, papers in percent_numbers.items():
-            for pid, fields in papers.items():
+            for _, fields in papers.items():
                 year = int(fields['year'].split('_')[0])
-                percent = float(fields['percent'])
+                percent = float(fields[data_domain])
                 conference_years[conference][year].append(percent)
                 all_years.add(year)
 
-        # get averages
+        # get averages by conference and year
         averages = {}
         for conference, years in conference_years.items():
             averages[conference] = {}
@@ -136,24 +176,38 @@ class Experiments:
 
         fig, ax = plt.subplots(figsize=figsize)
 
-        colors = plt.cm.tab10.colors
-
         for i, (conference, years_data) in enumerate(averages.items()):
             color = colors[i % len(colors)]
 
-            x_data = sorted_years
-            y_data = [years_data.get(year, np.nan) for year in sorted_years]
+            xy_pairs = []
+            for year in sorted_years:
+                if year in years_data:
+                    xy_pairs.append((year, years_data[year]))
 
-            ax.plot(x_data, y_data, marker='o', label=conference, color=color, 
-                linewidth=2, markersize=6, linestyle='-')
+            xy_pairs.sort(key=lambda pair: pair[0])
+
+            x_values = [pair[0] for pair in xy_pairs]
+            y_values = [pair[1] for pair in xy_pairs]
+
+            ax.plot(x_values, y_values, marker='o', label=conference, color=color, 
+                    linewidth=2, markersize=6, linestyle='-')
+
+        if average:
+            xy_pairs = []
+            for year, value in average.items():
+                xy_pairs.append((int(year), value))
+
+            xy_pairs.sort(key=lambda pair: pair[0])
+
+            x_values = [pair[0] for pair in xy_pairs]
+            y_values = [pair[1] for pair in xy_pairs]
+
+            ax.plot(x_values, y_values, marker='o', label='Average', color=colors[-1], 
+                    linewidth=2, markersize=6, linestyle='-')
 
         ax.set_xlabel('Year', fontsize=12)
-        ax.set_ylabel('Percentage of Numbers', fontsize=12)
-
-        if title:
-            ax.set_title(title, fontsize=14)
-        else:
-            ax.set_title('Percentage of Numbers in Research Papers', fontsize=14)
+        ax.set_ylabel(y_label if y_label else 'Percentage of Numbers', fontsize=12)
+        ax.set_title(title if title else 'Percentage of Numbers in Research Papers', fontsize=14)
     
         ax.set_xticks(sorted_years)
         ax.set_xticklabels(sorted_years, rotation=45)
@@ -169,41 +223,140 @@ class Experiments:
 
         return
 
-    def model_complexity_score(self,
-                               by: str = 'year',
-                               ) -> None:
-        """Model the complexity trend of the research with respect to the year/conf.
+    def model_complexity_score(self) -> None:
+        """Model the complexity trend of the research with respect to the year/conf."""
+        logging.info('Modeling the complexity score...')
 
-        Args:
-            by  : the category to model the trend by, 'year', 'conf'.
-        """
-        # NOTE: high
-        pass
+        # get complextity scores
+        complexity_scores = self._paper_dataset.get_complexity_score()
 
-    def model_trend(self,
-                          by: str = 'year',
-                          ) -> None:
-        """Model the trend of the research with respect to the year/conf.
+        # calculate an average of these numbers
+        average = defaultdict(dict)
+        for conf, papers in complexity_scores.items():
+            for pid, fields in papers.items():
+                year = fields['year'].split('_')[0]
+                score = fields['score']
+                if year not in average:
+                    average[year] = 0
+                average[year] += score
 
-        Args:
-            by  : the category to model the trend by, 'year', 'conf'.
-        """
-        # NOTE: high
-
-        # get papers
-        papers = self._paper_dataset.group_papers(by=by)
-
-        # get counts
-        counts = defaultdict(int)
-        for category, papers in papers.items():
-            counts[category] = len(papers)
+        for year in average:
+            paper_count = 0
+            for conf, papers in complexity_scores.items():
+                for pid, fields in papers.items():
+                    if fields['year'].split('_')[0] == year:
+                        paper_count += 1
+            average[year] /= paper_count
 
         # plot
-        plt.bar(counts.keys(), counts.values())
-        plt.show()
+        self._plot_float_features(
+            percent_numbers=complexity_scores,
+            average=average,
+            save_path='assets/complexity_scores.png',
+            data_domain='score',
+            y_label='Complexity Score',
+            title='Complexity Score in Research Papers',
+            colors=[
+                '#8dd3c7',  # Light teal
+                '#bebada',  # Light purple
+                '#fb8072',  # Light salmon
+                '#80b1d3',  # Light blue
+                '#fdb462',  # Light orange
+                '#b3de69',  # Light green
+                '#fccde5',  # Light pink
+                '#d9d9d9',  # Light gray
+                '#bc80bd',  # Light violet
+                '#ccebc5',  # Light mint
+                '#ffed6f',  # Light yellow
+                '#e41a1c',  # Strong red (for average)
+            ]
+            )
+
+    def model_trend(self) -> None:
+        """Model the trend of the research with respect to the year/conf."""
+        logging.info('Modeling the trend grouping by conference...')
+
+        # get papers by conference
+        papers = self._paper_dataset.group_papers(by='conf')
+
+        # get counts by conference
+        counts = defaultdict(int)
+        for conference, papers in papers.items():
+            counts[conference] = len(papers)
+
+        # plot
+        self._plot_trend(data=counts,
+                         save_path='assets/trend_by_conf.png',
+                         title='Trend of Research Papers by Conference',
+                         x_label='Conference'
+                         )
+
+        logging.info('Modeling the trend grouping by year...')
+
+        # get papers by year
+        papers = self._paper_dataset.group_papers(by='year')
+
+        # get counts by year
+        counts = defaultdict(int)
+        for year, papers in papers.items():
+            counts[year.split('_')[0]] = len(papers)
+
+        # plot
+        self._plot_trend(data=counts,
+                         save_path='assets/trend_by_year.png',
+                         title='Trend of Research Papers by Year',
+                         x_label='Year'
+                         )
+
+    def _plot_trend(self,
+                    data: Dict[str, int],
+                    figsize: tuple = (12, 8),
+                    save_path: str = None,
+                    title: str = None,
+                    x_label: str = None,
+                    ) -> None:
+        """Plot the trend of the research with respect to the year/conf."""
+        # sort the data
+        sorted_data = sorted(data.items(), key=lambda x: x[0])
+
+        # create the plot
+        fig, ax = plt.subplots(figsize=figsize)
+
+        x_values = [item[0] for item in sorted_data]
+        y_values = [item[1] for item in sorted_data]
+
+        ax.plot(x_values, y_values, marker='o', color='b', linewidth=2, markersize=6, linestyle='-')
+
+        ax.set_xlabel(x_label, fontsize=12)
+        ax.set_ylabel('Number of Papers', fontsize=12)
+
+        ax.set_title(title if title else 'Trend of Research Papers', fontsize=14)
+
+        ax.set_xticks(x_values)
+        ax.set_xticklabels(x_values, rotation=45)
+
+        ax.grid(True, linestyle='--', alpha=0.7)
+
+        plt.tight_layout()
+
+        if save_path:
+            plt.savefig(save_path)
+
+        return
 
     def model_semantic_change(self) -> None:
         """Model the semantic change of the research with respect to the year.
         """
         # NOTE: high
+
+        # get papers by year and conference
+
+        # train the word2vec model on each year's papers
+
+        # save the model
+
+        # get the embeddings of the keywords (input and concerned)
+
+        # 
+
         pass

@@ -9,6 +9,7 @@ import nltk
 import textstat
 from sklearn.feature_extraction.text import ENGLISH_STOP_WORDS, CountVectorizer
 
+# TODO: to write the procedure results in files
 
 class PaperDataset:
     def __init__(self, keyword: str) -> None:
@@ -268,10 +269,27 @@ class PaperDataset:
 
         return related_words
 
-    # TODO: define several keywords and see the co-occurrence
+    def keywords_cooccurrence(self, 
+                              word_list: list,
+                              conference_name: list = None,
+                              in_full_text: bool = True,
+                              ) -> Dict[str, Dict[int, Dict[str, Any]]]:
+        """Return the papers wtih the keyword co-occurring with the given word list.
 
-    def get_cooccurring_keywords(self,conference_name: list = None,) -> Dict[str, Dict[int, Dict[str, Any]]]:
-        """."""
+        Args:
+            word_list           : the list of words to search for.
+            conference_name     : conference to search for, default all.
+            in_full_text        : if the keyword must be in the full text.
+    
+        Returns:
+            papers              : the papers with the co-occurring keywords.    
+        """
+        # configs
+        if conference_name is None:
+            conference_name = self.conference_list
+
+        # TODO
+
         pass
 
     def get_percent_numbers(self,
@@ -331,6 +349,7 @@ class PaperDataset:
                         'score': textstat.gunning_fog(paper['text'])
                         }
         elif method == 'etymology':
+            # TODO
             pass
 
         return complexity_scores

@@ -9,7 +9,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Main module of the application.')
     parser.add_argument('--keyword', '-k', type=str, help='The keyword to search for.')
     parser.add_argument('--api_path', '-a', type=str, help='The path to the API key.')
-    parser.add_argument('--experiment', '-e', type=str, help='The experiment to run.', choices=['all', 'keyword_model', 'topic_model', 'cooccuring_keywords', 'percent_numbers', 'complexity_scores', 'trend'])
+    parser.add_argument('--experiment', '-e', type=str, help='The experiment to run.', choices=['all', 'keyword_model', 'topic_model', 'cooccuring_keywords', 'percent_numbers', 'complexity_scores', 'trend', 'semantic_change'])
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.INFO)
@@ -35,8 +35,12 @@ if __name__ == '__main__':
 
     # model complexity scores
     if args.experiment == 'complexity_scores' or args.experiment == 'all':
-        experiments.model_complexity_scores()
+        experiments.model_complexity_score()
 
     # model trend
     if args.experiment == 'trend' or args.experiment == 'all':
         experiments.model_trend()
+
+    # model semantic change
+    if args.experiment == 'semantic_change' or args.experiment == 'all':
+        experiments.model_semantic_change()
