@@ -5,10 +5,11 @@ import os
 from collections import defaultdict
 from typing import Any, Dict, List
 
+import gensim
 import matplotlib.pyplot as plt
+import nltk
 import numpy as np
 import torch
-from gensim.models import Word2Vec
 from sentence_transformers import SentenceTransformer
 from sklearn.cluster import KMeans
 
@@ -419,42 +420,14 @@ class Experiments:
 
         # seperate the papers by decade
         decades = defaultdict(lambda: defaultdict(list))
-        for conf, papers in papers.items():
-            for pid, fields in papers.items():
+        for conf, conf_papers in papers.items():
+            for fields in conf_papers:
                 year = fields['year'].split('_')[0]
                 decade = year[:3] + '0'
                 decades[decade][conf].append(fields['text'])
 
-        # embeddings: conf: [key: embedding]
-        embeddings = defaultdict(dict)
-
-        # main loop
-        for decade in decades:
-            # get the papers
-            papers = decades[decade]
-
-            # TODO: train with all data
-
-            # load or train the word2vec model
-            logging.info('Loading or training the Word2Vec model...')
-            model_path = f'data/word2vec_{decade}.model'
-            if model_path.exists():
-                model = Word2Vec.load(model_path)
-            else:
-                self._train_word2vec(
-                    model_path=model_path,
-                    data=papers
-                    )
-
-            # get the embeddings of the keywords (input and concerned)
-            anchor_words = []
-            words_to_check = anchor_words.append(self._keyword)
-
-            for word in words_to_check:
-                if word in model.wv:
-                    embeddings[decade].append(model.wv[word])
-                else:
-                    logging.warning(f"'{word}' not in vocabulary")
+        # get the embeddings
+        embeddings = self._get_embeddings(decades)
 
         # match the embeddings
         self._match_embeddings(embeddings=embeddings)
@@ -462,8 +435,14 @@ class Experiments:
         # calculate the semantic change
         self._calculate_semantic_change(embeddings=embeddings)
 
+        # get the embeddings of the keywords (input and concerned)
+        anchor_words = []
+        words_to_plot = anchor_words.append(self._keyword)
+
         # plot the semantic change
-        self._plot_semantic_change(embeddings=embeddings)
+        self._plot_semantic_change(embeddings=embeddings,
+                                   words_to_plot=words_to_plot
+                                   )
 
     def _train_word2vec(self,
                         model_path: str,
@@ -479,7 +458,7 @@ class Experiments:
         logging.info('Training the Word2Vec model...')
 
         # train model
-        model = Word2Vec(
+        model = gensim.models.Word2Vec(
             sentences=data,
             vector_size=vector_size,
             window=window,
@@ -493,6 +472,70 @@ class Experiments:
         model.save(model_path)
 
         return
+
+    def _get_embeddings(self, data: Dict[str, Dict[str, List[str]]]) -> Dict[str, List[np.ndarray]]:
+        """Get the embeddings through training or loading."""
+
+        # embeddings: conf: [key: embedding]
+        embeddings = defaultdict(dict)
+
+        # main loop
+        for decade in data.keys():
+            logging.info(f'Getting embeddings for {decade}...')
+
+            data_path = f'data/{decade}_embeddings.json'
+
+            if os.path.exists(data_path):
+                with open(data_path, 'r') as f:
+                    embeddings[decade] = json.load(f)
+                continue
+
+            logging.info('Embeddings not found, training...')
+            # get the papers
+            train_data = []
+            for conf, texts in data[decade].items():
+                for text in texts:
+                    text_data = []
+                    clean_text = text.replace('\n', ' ')
+                    for sent in nltk.tokenize.sent_tokenize(clean_text):
+                        text_data.append([word.lower() for word in nltk.tokenize.word_tokenize(sent)])
+                    train_data.extend(text_data)                
+
+            # load or train the word2vec model
+            logging.info('Loading or training the Word2Vec model...')
+            model_path = f'models/word2vec_{decade}.model'
+            if os.path.exists(model_path):
+                model = gensim.models.Word2Vec.load(model_path)
+            else:
+                self._train_word2vec(
+                    model_path=model_path,
+                    data=train_data
+                    )
+                model = gensim.models.Word2Vec.load(model_path)
+
+            # build the vocabulary
+            vocabulary = set()
+            for conf, texts in data[decade].items():
+                for text in texts:
+                    for sent in nltk.tokenize.sent_tokenize(text):
+                        for word in nltk.tokenize.word_tokenize(sent):
+                            vocabulary.add(word)
+
+            # save the embeddings
+            embeddings[decade] = defaultdict(list)
+            for word in vocabulary:
+                if word in model.wv:
+                    embeddings[decade][word] = model.wv[word].to_list()
+                else:
+                    logging.warning(f"'{word}' not in vocabulary")
+
+        # save embeddings
+        for decade in embeddings.keys():
+            with open(data_path, 'w') as f:
+                f.write(json.dumps(embeddings[decade], indent=4, 
+                ensure_ascii=False))
+
+        return embeddings
 
     def _match_embeddings(self,
                           embeddings: Dict[str, List[np.ndarray]]
@@ -515,7 +558,8 @@ class Experiments:
         pass
 
     def _plot_semantic_change(self,
-                              embeddings: Dict[str, List[np.ndarray]]
+                              embeddings: Dict[str, List[np.ndarray]],
+                              words_to_plot: List[str]
                               ) -> None:
         """Plot the semantic change."""
 
