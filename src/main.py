@@ -3,6 +3,7 @@ import argparse
 import logging
 
 from utils.experiment import Experiments
+from utils.semantic_change import ExprSemanticChange
 
 if __name__ == '__main__':
     # configs
@@ -43,4 +44,5 @@ if __name__ == '__main__':
 
     # model semantic change
     if args.experiment == 'semantic_change' or args.experiment == 'all':
-        experiments.model_semantic_change()
+        expr_semantic_change = ExprSemanticChange(keyword=args.keyword, api=args.api_path)
+        expr_semantic_change.model_semantic_change()
