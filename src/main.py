@@ -4,13 +4,14 @@ import logging
 
 from utils.experiment import Experiments
 from utils.semantic_change import ExprSemanticChange
+from utils.semantic_change_bert import ExprSemanticChangeBERT
 
 if __name__ == '__main__':
     # configs
     parser = argparse.ArgumentParser(description='Main module of the application.')
     parser.add_argument('--keyword', '-k', type=str, help='The keyword to search for.')
     parser.add_argument('--api_path', '-a', type=str, help='The path to the API key.')
-    parser.add_argument('--experiment', '-e', type=str, help='The experiment to run.', choices=['all', 'keyword_model', 'topic_model', 'cooccuring_keywords', 'percent_numbers', 'complexity_scores', 'trend', 'semantic_change'])
+    parser.add_argument('--experiment', '-e', type=str, help='The experiment to run.', choices=['all', 'keyword_model', 'topic_model', 'cooccuring_keywords', 'percent_numbers', 'complexity_scores', 'trend', 'semantic_change', 'semantic_change_bert'])
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.INFO)
@@ -46,3 +47,8 @@ if __name__ == '__main__':
     if args.experiment == 'semantic_change' or args.experiment == 'all':
         expr_semantic_change = ExprSemanticChange(keyword=args.keyword, api=args.api_path)
         expr_semantic_change.model_semantic_change()
+
+    # model semantic change with BERT
+    if args.experiment == 'semantic_change_bert' or args.experiment == 'all':
+        expr_semantic_change_bert = ExprSemanticChangeBERT(keyword=args.keyword, api=args.api_path)
+        expr_semantic_change_bert.model_semantic_change()

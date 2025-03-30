@@ -39,7 +39,7 @@ def main():
     # Load the data
     keywords_data = load_json('data/keywords.json')
     topics_data = load_json('data/topics.json')
-    
+
     # Process the data
     keywords_decade_counts = process_keywords(keywords_data)
     topics_decade_counts = process_topics(topics_data)

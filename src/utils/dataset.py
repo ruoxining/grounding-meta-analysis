@@ -36,7 +36,16 @@ class PaperDataset:
     def get_conference(self, conference_name: str) -> List[str]:
         """Return the dataset for the given conference."""
         return self._ds[conference_name]
-    
+
+    def get_topic_model(self, year):
+        """Return the topic model for a given year if it exists."""
+        # check if a topic model was previously created
+        if hasattr(self, '_topic_models') and year in self._topic_models:
+            return self._topic_models[year]
+        
+        # If no existing model, return None
+        return None
+
     def filter_papers(self,
                       conference_name: str = None,
                       in_full_text: bool = True,
@@ -204,8 +213,12 @@ class PaperDataset:
             in_full_text=in_full_text,
             get_section='full_text'
             )
-
-        # main loop
+        
+        # Initialize topic models dictionary if it doesn't exist
+        if not hasattr(self, '_topic_models'):
+            self._topic_models = {}
+        
+        # Main loop
         logging.info("Extracting the topics.")
         topics_all = defaultdict(dict)
         for year in papers:
@@ -214,10 +227,13 @@ class PaperDataset:
                 continue
             try:
                 topics, _ = topic_model.fit_transform(papers[year])
+                # Store the topic model for later visualization
+                self._topic_models[year] = topic_model
             except:
                 # TODO: why is this error
                 logging.debug('Skipping year %s due to an error.???', year)
                 continue
+
             topic_info = topic_model.get_topic_info()
             topic_reprensentation = {}
             for topic_id in set(topics):

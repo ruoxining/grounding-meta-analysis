@@ -63,9 +63,30 @@ class Experiments:
             with open(topic_path, 'w') as f:
                 f.write(json.dumps(topics, indent=4, ensure_ascii=False))
 
-        # get embeddings
-        # TODO
-        pass
+        # generate bertopic visualizations for each year
+        for year in topics:
+            if 'topic_info' in topics[year]:
+                try:
+                    # ensure output directory exists
+                    os.makedirs("plots", exist_ok=True)
+                    
+                    # create bertopic visualization
+                    topic_model = self._paper_dataset.get_topic_model(year)
+                    if topic_model is not None:
+                        # visualization 1: intertopic distance map
+                        fig = topic_model.visualize_topics()
+                        fig.write_html(f"plots/{self._keyword}_topics_intertopic_distance_{year}.html")
+                        
+                        # visualization 2: topic barchart
+                        if 'topic_reprensentation' in topics[year]:
+                            for topic_id in topics[year]['topic_reprensentation']:
+                                if topic_id != "-1":  # Skip outlier topic
+                                    fig = topic_model.visualize_barchart(topic_id)
+                                    fig.write_html(f"plots/{self._keyword}_topic_{topic_id}_barchart_{year}.html")
+                        
+                        logging.info(f"Generated BERTopic visualizations for year {year}")
+                except Exception as e:
+                    logging.error(f"Failed to create BERTopic visualization for year {year}: {e}")
 
     def _visualize(self, embedding: np.ndarray, labels: List[int]) -> None:
         """Visualize the clustering results.

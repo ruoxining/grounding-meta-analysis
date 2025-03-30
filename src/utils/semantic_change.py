@@ -18,10 +18,10 @@ from .dataset import PaperDataset
 
 class ExprSemanticChange:
     """Class for the experiment to detect the semantic change."""
-    
+
     def __init__(self, keyword, api):
         """Initialize the class.
-        
+
         Args:
             keyword: The keyword to track for semantic change
             api: The API instance for accessing data
@@ -30,6 +30,7 @@ class ExprSemanticChange:
         self._keyword = keyword  # keeping both for compatibility
         self._api = api
         self._paper_dataset = PaperDataset(keyword=keyword)
+        self._anchor_words = ['model', 'information', 'feature', 'system', 'concept', 'course', 'computer', 'vision', 'symbol', 'robot', 'language', 'algorithm', 'robotics', 'AI', 'ML', 'pattern', 'recognition', 'learning', 'neural', 'network', 'modality', 'speech', 'visual', 'CV', 'symbolic', 'physic', 'cognition', 'understand', 'reason', 'knowledge', 'representation', 'perception', 'action', 'planning', 'control', 'decision', 'making', 'processing', 'NLP', 'generation', 'translation', 'dialogue', 'chatbot', 'reasoning', 'logic', 'inference', 'explainable', 'interpretable', 'explain', 'interpret']
 
     def model_semantic_change(self) -> None:
         """Model the semantic change of the research with respect to the year.
@@ -44,8 +45,7 @@ class ExprSemanticChange:
         semantic_changes = self._calculate_semantic_change(embeddings=embeddings)
 
         # get the embeddings of the keywords (input and concerned)
-        anchor_words = ['model', 'information', 'feature', 'system', 'concept', 'course', 'computer', 'vision', 'symbol', 'robot', 'language', 'algorithm', 'robotics', 'AI', 'ML', 'pattern', 'recognition', 'learning', 'neural', 'network', 'modality', 'speech', 'visual', 'CV', 'symbolic', 'physic', 'cognition', 'understand', 'reason', 'knowledge', 'representation', 'perception', 'action', 'planning', 'control', 'decision', 'making', 'processing', 'NLP', 'generation', 'translation', 'dialogue', 'chatbot', 'reasoning', 'logic', 'inference', 'explainable', 'interpretable', 'explain', 'interpret']
-        words_to_plot = anchor_words + [self._keyword]
+        words_to_plot = self._anchor_words + [self._keyword]
 
         # plot the semantic change
         self._plot_semantic_change(embeddings=embeddings,
@@ -315,7 +315,7 @@ class ExprSemanticChange:
         
         # get diagonal elements (similarities between corresponding vectors)
         direct_similarities = np.diag(similarities)
-        
+
         # return average similarity
         return np.mean(direct_similarities)
 
@@ -335,7 +335,7 @@ class ExprSemanticChange:
         all_decades = sorted(list(embeddings.keys()))
         base_decade = all_decades[-1]  # Using the latest decade as reference
         semantic_changes = {}
-        
+
         # load transformed embeddings for each decade
         transformed_embeddings = {}
         for decade in all_decades[:-1]:  # Skip the base decade
@@ -345,35 +345,35 @@ class ExprSemanticChange:
             except FileNotFoundError:
                 logging.warning(f'Transformed embeddings for {decade} not found, skipping')
                 continue
-        
+
         # add the base decade embeddings
         transformed_embeddings[base_decade] = embeddings[base_decade]
-        
+
         # calculate semantic change for each decade relative to base
         for decade in all_decades[:-1]:
             if decade not in transformed_embeddings:
                 continue
-                
+
             semantic_changes[decade] = {}
-            
+
             # find common words between this decade and base decade
             common_words = set(transformed_embeddings[decade].keys()) & set(transformed_embeddings[base_decade].keys())
-            
+
             for word in common_words:
                 # get embeddings
                 vec1 = np.array(transformed_embeddings[decade][word])
                 vec2 = np.array(transformed_embeddings[base_decade][word])
-                
+
                 # normalize vectors
                 vec1 = vec1 / np.linalg.norm(vec1)
                 vec2 = vec2 / np.linalg.norm(vec2)
-                
+
                 # calculate cosine similarity (1 - cosine distance)
                 similarity = np.dot(vec1, vec2)
-                
+
                 # semantic change is the inverse of similarity (higher = more change)
                 semantic_changes[decade][word] = 1.0 - similarity
-        
+
         # save semantic changes
         with open('data/semantic_changes.json', 'w') as f:
             f.write(json.dumps(semantic_changes, indent=4, ensure_ascii=False))
@@ -382,25 +382,20 @@ class ExprSemanticChange:
 
     def _plot_semantic_change(self,
                               embeddings: Dict[str, Dict[str, List[float]]],
-                              words_to_plot: List[str],
-                              semantic_changes: Optional[Dict[str, Dict[str, float]]] = None
                               ) -> None:
         """Plot the semantic change.
         
         Args:
             embeddings: Dictionary of decades with words and their embeddings
-            words_to_plot: List of words to plot
-            semantic_changes: Optional dictionary of semantic change scores
         """
         logging.info('Plotting semantic change...')
 
         all_decades = sorted(list(embeddings.keys()))
 
-        self._plot_trajectory(embeddings, words_to_plot, all_decades)
+        self._plot_trajectory(embeddings, all_decades)
 
-    def _plot_trajectory(self, 
+    def _plot_trajectory(self,
                          embeddings: Dict[str, Dict[str, List[float]]],
-                         words_to_plot: List[str],
                          decades: List[str]) -> None:
         """Plot the trajectory of words in 2D space.
         
@@ -421,84 +416,83 @@ class ExprSemanticChange:
         
         # add the base decade embeddings
         transformed_embeddings[decades[-1]] = embeddings[decades[-1]]
-        
+
         # extract keyword (first element) and anchor words (rest of elements)
         keyword = self._keyword
-        anchor_words = [word for word in words_to_plot if word != keyword]
-        
+
         # collect embeddings for keyword across decades
         word_trajectories = defaultdict(list)
         decade_labels = []
-        
+
         # get trajectory for keyword across all decades
         for decade in sorted(transformed_embeddings.keys()):
             if keyword in transformed_embeddings[decade]:
                 word_trajectories[keyword].append(transformed_embeddings[decade][keyword])
             decade_labels.append(decade)
-        
+
         # check if we have enough data for keyword
         if len(word_trajectories[keyword]) < 2:
             logging.warning(f'Not enough data to plot trajectory for keyword "{keyword}"')
             return
-        
+
         # collect anchor word embeddings (only from the latest decade)
         anchor_embeddings = {}
         latest_decade = decades[-1]
-        
-        for word in anchor_words:
+
+        for word in self._anchor_words:
             if word in transformed_embeddings[latest_decade]:
                 anchor_embeddings[word] = transformed_embeddings[latest_decade][word]
             else:
                 logging.warning(f'Anchor word "{word}" not found in latest decade')
-        
+
         # get all embeddings for PCA
         all_embeddings = []
         # add keyword trajectory
         all_embeddings.extend(word_trajectories[keyword])
         # add anchor points
         all_embeddings.extend(list(anchor_embeddings.values()))
-        
+
         if not all_embeddings:
             logging.warning('No embeddings to plot')
             return
-            
+
         # apply PCA to reduce to 2D
         pca = PCA(n_components=2)
         pca.fit(all_embeddings)
-        
+
         # create figure
         plt.figure(figsize=(12, 8))
-        
+
         # plot keyword trajectory
         if len(word_trajectories[keyword]) >= 2:
             # project to 2D
             trajectory = pca.transform(word_trajectories[keyword])
-            
+
             # plot line with larger markers for keyword
             plt.plot(trajectory[:, 0], trajectory[:, 1], 'o-', 
                      label=keyword, linewidth=2, markersize=8)
-            
+
             # annotate decades for keyword
             for i, decade in enumerate(decade_labels[:len(trajectory)]):
                 plt.annotate(decade, (trajectory[i, 0], trajectory[i, 1]), 
                              textcoords="offset points", xytext=(0, 10), ha='center')
-        
+
         # plot anchor words as single points
         for word, embedding in anchor_embeddings.items():
             # project to 2D
             point = pca.transform([embedding])[0]
-            
+
             # plot as single point with different marker
             plt.scatter(point[0], point[1], marker='*', s=100, label=word)
-            
+
             # annotate the word
             plt.annotate(word, (point[0], point[1]), 
                          textcoords="offset points", xytext=(5, 5), ha='left')
-        
+
         plt.title(f'Semantic Change Trajectory for "{keyword}"')
         plt.xlabel('PCA Dimension 1')
         plt.ylabel('PCA Dimension 2')
         plt.grid(True, linestyle='--', alpha=0.7)
         plt.tight_layout()
-        plt.savefig('assets/semantic_trajectory.png', dpi=300)
+        plt.savefig('assets/semantic_trajectory.pdf', dpi=300)
         plt.close()
